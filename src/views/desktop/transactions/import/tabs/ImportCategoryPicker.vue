@@ -6,35 +6,37 @@
                 <slot />
             </button>
         </template>
-        <v-card width="480" @click.stop @keydown.esc.stop.prevent="open = false">
-            <v-text-field ref="searchInput" class="ma-2" density="compact" hide-details
-                          :prepend-inner-icon="mdiMagnify" :placeholder="tt('Find category')" :aria-label="tt('Find category')"
-                          v-model="search" @keydown="onSearchKeydown" />
-            <div class="import-category-columns" v-if="filteredOptions.length">
-                <v-list class="import-category-list" :aria-label="tt('Category')">
-                    <v-list-item v-for="parent in filteredParents" :key="parent.id"
-                                 :active="parent.id === activeParentId" :title="parent.name"
-                                 @click="browseParent(parent.id)">
-                        <template #prepend>
-                            <ItemIcon class="me-2" :icon-type="getCategoryIconType(parent.iconType)"
-                                      :icon-id="parent.icon" :color="parent.color" />
-                        </template>
-                    </v-list-item>
-                </v-list>
-                <v-list ref="resultList" class="import-category-list" role="listbox" :aria-label="tt('Category')">
-                    <v-list-item v-for="option in activeOptions" :key="option.id"
-                                 :active="option.id === highlightedOption?.id" :title="option.category.name"
-                                 role="option" :aria-selected="option.id === highlightedOption?.id"
-                                 @click="select(option.id)">
-                        <template #prepend>
-                            <ItemIcon class="me-2" :icon-type="getCategoryIconType(option.category.iconType)"
-                                      :icon-id="option.category.icon" :color="option.category.color" />
-                        </template>
-                    </v-list-item>
-                </v-list>
-            </div>
-            <div class="text-body-large mx-4 mt-3 mb-2" v-else>{{ tt('No available category') }}</div>
-        </v-card>
+        <div @click.stop @keydown.esc.stop.prevent="open = false">
+            <v-card width="480">
+                <v-text-field ref="searchInput" class="ma-2" density="compact" hide-details
+                              :prepend-inner-icon="mdiMagnify" :placeholder="tt('Find category')" :aria-label="tt('Find category')"
+                              v-model="search" @keydown="onSearchKeydown" />
+                <div class="import-category-columns" v-if="filteredOptions.length">
+                    <v-list class="import-category-list" :aria-label="tt('Category')">
+                        <v-list-item v-for="parent in filteredParents" :key="parent.id"
+                                     :active="parent.id === activeParentId" :title="parent.name"
+                                     @click="browseParent(parent.id)">
+                            <template #prepend>
+                                <ItemIcon class="me-2" :icon-type="getCategoryIconType(parent.iconType)"
+                                          :icon-id="parent.icon" :color="parent.color" />
+                            </template>
+                        </v-list-item>
+                    </v-list>
+                    <v-list ref="resultList" class="import-category-list" role="listbox" :aria-label="tt('Category')">
+                        <v-list-item v-for="option in activeOptions" :key="option.id"
+                                     :active="option.id === highlightedOption?.id" :title="option.category.name"
+                                     role="option" :aria-selected="option.id === highlightedOption?.id"
+                                     @click="select(option.id)">
+                            <template #prepend>
+                                <ItemIcon class="me-2" :icon-type="getCategoryIconType(option.category.iconType)"
+                                          :icon-id="option.category.icon" :color="option.category.color" />
+                            </template>
+                        </v-list-item>
+                    </v-list>
+                </div>
+                <div class="text-body-large mx-4 mt-3 mb-2" v-else>{{ tt('No available category') }}</div>
+            </v-card>
+        </div>
     </v-menu>
 </template>
 
