@@ -206,7 +206,7 @@
             </template>
             <template #item.actualSourceAccountName="{ item }">
                 <div class="d-flex align-center" v-if="editingTransaction !== item">
-                    <import-account-picker :accounts="getQuickAccountOptions(item, false)" :disabled="!!disabled || !getQuickAccountOptions(item, false).length"
+                    <import-account-picker :groups="getQuickAccountGroups(item, false)" :disabled="!!disabled || !getQuickAccountOptions(item, false).length"
                                            :label="getSourceAccountTitle(item)"
                                            @update:open="onQuickPickerOpen(item, $event)" @select="applyQuickAccount(item, $event, false)">
                         <template #leading>
@@ -218,7 +218,7 @@
                     </import-account-picker>
                     <v-icon class="icon-with-direction mx-1" size="13" :icon="mdiArrowRight" v-if="item.type === TransactionType.Transfer" />
                     <import-account-picker v-if="item.type === TransactionType.Transfer"
-                                           :accounts="getQuickAccountOptions(item, true)" :disabled="!!disabled || !getQuickAccountOptions(item, true).length"
+                                           :groups="getQuickAccountGroups(item, true)" :disabled="!!disabled || !getQuickAccountOptions(item, true).length"
                                            :label="tt('Destination Account')"
                                            @update:open="onQuickPickerOpen(item, $event)" @select="applyQuickAccount(item, $event, true)">
                         <template #leading>
@@ -230,8 +230,8 @@
                     </import-account-picker>
 
                 </div>
-                <div class="d-flex align-center" :style="`width: ${item.type === TransactionType.Transfer ? 450 : 200}px`"  v-if="editingTransaction === item">
-                    <two-column-select density="compact" variant="plain"
+                <div class="d-flex align-center" v-if="editingTransaction === item">
+                    <two-column-select density="compact" variant="plain" style="width: 260px; flex: 0 0 260px"
                                        primary-key-field="id" primary-value-field="category"
                                        primary-title-field="name" primary-footer-field="displayBalance"
                                        primary-icon-field="icon" primary-icon-type-field="iconType" primary-icon-type="account"
@@ -248,7 +248,7 @@
                                        v-model="item.sourceAccountId">
                     </two-column-select>
                     <v-icon class="icon-with-direction mx-1" size="13" :icon="mdiArrowRight" v-if="item.type === TransactionType.Transfer"></v-icon>
-                    <two-column-select density="compact" variant="plain"
+                    <two-column-select density="compact" variant="plain" style="width: 260px; flex: 0 0 260px"
                                        primary-key-field="id" primary-value-field="category"
                                        primary-title-field="name" primary-footer-field="displayBalance"
                                        primary-icon-field="icon" primary-icon-type-field="iconType" primary-icon-type="account"
@@ -1708,18 +1708,27 @@ function getQuickAccountOptions(transaction: ImportTransaction, destination: boo
     return allVisibleAccounts.value.filter(account => transaction.type !== TransactionType.Transfer || account.id !== otherId);
 }
 
+function getQuickAccountGroups(transaction: ImportTransaction, destination: boolean): CategorizedAccountWithDisplayBalance[] {
+    const allowedIds = new Set(getQuickAccountOptions(transaction, destination).map(account => account.id));
+    return allVisibleCategorizedAccounts.value.map(group => ({
+        ...group,
+        accounts: group.accounts.filter(account => allowedIds.has(account.id))
+    })).filter(group => group.accounts.length > 0);
+}
+
 function applyQuickAccount(transaction: ImportTransaction, accountId: string, destination: boolean): void {
-    if (props.disabled || !props.importTransactions?.includes(transaction)
+    const currentTransaction = props.importTransactions?.find(item => item.index === transaction.index);
+    if (props.disabled || !currentTransaction
         || (destination && transaction.type !== TransactionType.Transfer)
         || !getQuickAccountOptions(transaction, destination).some(account => account.id === accountId)) {
         return;
     }
     if (destination) {
-        transaction.destinationAccountId = accountId;
+        currentTransaction.destinationAccountId = accountId;
     } else {
-        transaction.sourceAccountId = accountId;
+        currentTransaction.sourceAccountId = accountId;
     }
-    updateTransactionData(transaction);
+    updateTransactionData(currentTransaction);
     quickPickerTransaction.value = null;
 }
 
@@ -1736,13 +1745,14 @@ function onQuickPickerOpen(transaction: ImportTransaction, open: boolean): void 
             editTransaction(editingTransaction.value);
         }
         quickPickerTransaction.value = transaction;
-    } else if (quickPickerTransaction.value === transaction) {
+    } else if (quickPickerTransaction.value?.index === transaction.index) {
         quickPickerTransaction.value = null;
     }
 }
 
 function applyQuickCategory(transaction: ImportTransaction, categoryId: string): void {
-    if (props.disabled || !props.importTransactions?.includes(transaction)) {
+    const currentTransaction = props.importTransactions?.find(item => item.index === transaction.index);
+    if (props.disabled || !currentTransaction) {
         return;
     }
     const allowed = getQuickCategoryOptions(transaction).some(parent => !parent.hidden
@@ -1750,8 +1760,8 @@ function applyQuickCategory(transaction: ImportTransaction, categoryId: string):
     if (!allowed) {
         return;
     }
-    transaction.categoryId = categoryId;
-    updateTransactionData(transaction);
+    currentTransaction.categoryId = categoryId;
+    updateTransactionData(currentTransaction);
     quickPickerTransaction.value = null;
 }
 

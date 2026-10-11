@@ -15,11 +15,27 @@
                 <v-text-field ref="searchInput" class="ma-2" density="compact" hide-details
                               :prepend-inner-icon="mdiMagnify" :placeholder="tt('Find account')" :aria-label="tt('Find account')"
                               v-model="search" @keydown="onSearchKeydown" />
-                <v-list ref="resultList" class="import-account-list" role="listbox" :aria-label="tt('Account')" v-if="filteredOptions.length">
-                    <v-list-item v-for="(option, index) in filteredOptions" :key="option.id"
-                                 :active="index === highlightedIndex" :title="option.name" :subtitle="option.currency"
-                                 role="option" :aria-selected="index === highlightedIndex" @click="select(option.id)" />
-                </v-list>
+                <div class="import-account-columns" v-if="filteredOptions.length">
+                    <v-list class="import-account-list" :aria-label="tt('Account')">
+                        <v-list-item v-for="group in filteredGroups" :key="group.category"
+                                     :active="group.category === activeGroup" :title="tt(group.name)" :subtitle="group.displayBalance"
+                                     @click="browseGroup(group.category)">
+                            <template #prepend>
+                                <ItemIcon class="me-2" icon-type="account" :icon-id="group.icon" />
+                            </template>
+                        </v-list-item>
+                    </v-list>
+                    <v-list ref="resultList" class="import-account-list" role="listbox" :aria-label="tt('Account')">
+                        <v-list-item v-for="option in activeOptions" :key="option.id"
+                                     :active="option.id === highlightedOption?.id" :title="option.account.name" :subtitle="option.account.displayBalance"
+                                     role="option" :aria-selected="option.id === highlightedOption?.id" @click="select(option.id)">
+                            <template #prepend>
+                                <ItemIcon class="me-2" :icon-type="getAccountIconType(option.account.iconType)"
+                                          :icon-id="option.account.icon" :color="option.account.color" />
+                            </template>
+                        </v-list-item>
+                    </v-list>
+                </div>
                 <div class="text-body-large mx-4 mt-3 mb-2" v-else>{{ tt('No available account') }}</div>
             </v-card>
         </div>
@@ -33,10 +49,11 @@ import { VList } from 'vuetify/components/VList';
 import { useI18n } from '@/locales/helpers.ts';
 import { mdiMagnify, mdiMenuDown, mdiMenuUp } from '@mdi/js';
 import { NormalizedText } from '@/core/text.ts';
-import type { Account } from '@/models/account.ts';
+import { getAccountIconType } from '@/lib/icon.ts';
+import type { CategorizedAccountWithDisplayBalance } from '@/models/account.ts';
 
 const props = defineProps<{
-    accounts: Account[];
+    groups: CategorizedAccountWithDisplayBalance[];
     disabled?: boolean;
     hideDropdown?: boolean;
     label?: string;
@@ -48,14 +65,29 @@ const emit = defineEmits<{
 const { tt } = useI18n();
 const open = ref(false);
 const search = ref('');
-const highlightedIndex = ref(0);
+const highlightedIndex = ref(-1);
 const searchInput = useTemplateRef<VTextField>('searchInput');
 const resultList = useTemplateRef<VList>('resultList');
 const filteredOptions = computed(() => {
     const query = NormalizedText.normalizeForSearch(search.value);
-    return props.accounts.filter(account =>
-        NormalizedText.normalizeForSearch(account.name).includes(query));
+    return props.groups.flatMap(group => group.accounts.map(account => ({
+        id: account.id,
+        group: group.category,
+        account,
+        searchText: `${tt(group.name)} ${account.name}`
+    }))).filter(option => NormalizedText.normalizeForSearch(option.searchText).includes(query));
 });
+const highlightedOption = computed(() => filteredOptions.value[highlightedIndex.value]);
+const activeGroup = computed(() => highlightedOption.value?.group);
+const filteredGroups = computed(() => props.groups.filter(group => filteredOptions.value.some(option => option.group === group.category)));
+const activeOptions = computed(() => filteredOptions.value.filter(option => option.group === activeGroup.value));
+
+function browseGroup(category: number): void {
+    const index = filteredOptions.value.findIndex(option => option.group === category);
+    if (index >= 0) {
+        highlightedIndex.value = index;
+    }
+}
 
 function select(id: string): void {
     if (props.disabled || !filteredOptions.value.some(option => option.id === id)) {
@@ -81,12 +113,14 @@ function onSearchKeydown(event: KeyboardEvent): void {
         event.stopPropagation();
         const count = filteredOptions.value.length;
         if (count) {
-            highlightedIndex.value = (highlightedIndex.value + (event.key === 'ArrowDown' ? 1 : count - 1)) % count;
+            highlightedIndex.value = highlightedIndex.value < 0
+                ? (event.key === 'ArrowDown' ? 0 : count - 1)
+                : (highlightedIndex.value + (event.key === 'ArrowDown' ? 1 : count - 1)) % count;
         }
     }
 }
 
-watch(filteredOptions, () => { highlightedIndex.value = 0; });
+watch(filteredOptions, () => { highlightedIndex.value = search.value.trim() ? 0 : -1; });
 watch(highlightedIndex, async () => {
     await nextTick();
     resultList.value?.$el.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
@@ -97,7 +131,7 @@ watch(open, async value => {
     emit('update:open', value);
     if (value) {
         search.value = '';
-        highlightedIndex.value = 0;
+        highlightedIndex.value = -1;
         await nextTick();
         // Lazy menu content may mount after the first tick.
         setTimeout(() => { if (open.value) searchInput.value?.focus(); }, 50);
