@@ -47,6 +47,9 @@ Options:
     --no-lint               Do not execute lint check before building
     --no-test               Do not execute unit testing before building (You can use environment variable "SKIP_TESTS" to skip specified tests)
     -h, --help              Show help
+
+Live exchange-rate API tests are opt-in with CHECK_3RD_API=1.
+For Docker builds, use docker build --build-arg CHECK_3RD_API=1 .
 EOF
 }
 

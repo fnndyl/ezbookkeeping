@@ -373,8 +373,8 @@ func TestExchangeRatesApiLatestExchangeRateHandler_CentralBankOfUzbekistanDataSo
 }
 
 func executeLatestExchangeRateHandler(t *testing.T, dataSourceType string) *models.LatestExchangeRateResponse {
-	if os.Getenv("BUILD_PIPELINE") == "1" && os.Getenv("CHECK_3RD_API") != "1" {
-		return nil
+	if os.Getenv("CHECK_3RD_API") != "1" {
+		t.Skip("live exchange-rate API tests require CHECK_3RD_API=1")
 	}
 
 	config := &settings.Config{
