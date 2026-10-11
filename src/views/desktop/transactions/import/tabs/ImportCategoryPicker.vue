@@ -1,10 +1,14 @@
 <template>
     <v-menu v-model="open" :close-on-content-click="false" :disabled="disabled" max-width="520">
         <template #activator="{ props: activatorProps }">
-            <button type="button" class="d-flex align-center text-start" style="color: inherit"
-                    v-bind="activatorProps" :disabled="disabled" :aria-label="tt('Category')" @click.stop>
-                <slot />
-            </button>
+            <div class="d-flex align-center">
+                <slot name="leading" />
+                <button type="button" class="import-category-activator d-flex align-center text-start"
+                        v-bind="activatorProps" :disabled="disabled" :aria-label="tt('Category')" @click.stop>
+                    <slot />
+                    <v-icon class="ms-auto" size="18" :icon="open ? mdiMenuUp : mdiMenuDown" v-if="!hideDropdown" />
+                </button>
+            </div>
         </template>
         <div @click.stop @keydown.esc.stop.prevent="open = false">
             <v-card width="480">
@@ -45,7 +49,7 @@ import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 
 import { VTextField } from 'vuetify/components/VTextField';
 import { VList } from 'vuetify/components/VList';
 import { useI18n } from '@/locales/helpers.ts';
-import { mdiMagnify } from '@mdi/js';
+import { mdiMagnify, mdiMenuDown, mdiMenuUp } from '@mdi/js';
 import { getCategoryIconType } from '@/lib/icon.ts';
 import { NormalizedText } from '@/core/text.ts';
 import type { TransactionCategory } from '@/models/transaction_category.ts';
@@ -53,6 +57,7 @@ import type { TransactionCategory } from '@/models/transaction_category.ts';
 const props = defineProps<{
     categories: TransactionCategory[];
     disabled?: boolean;
+    hideDropdown?: boolean;
 }>();
 const emit = defineEmits<{
     (e: 'select', id: string): void;
@@ -138,6 +143,28 @@ watch(open, async value => {
 </script>
 
 <style scoped>
+.import-category-activator {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    padding: 0;
+    min-height: 28px;
+    gap: 8px;
+    width: 260px;
+    cursor: pointer;
+}
+
+.import-category-activator:disabled {
+    cursor: default;
+}
+
+.import-category-activator:focus-visible {
+    outline: 2px solid rgb(var(--v-theme-primary));
+    outline-offset: 2px;
+}
+
 .import-category-columns {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

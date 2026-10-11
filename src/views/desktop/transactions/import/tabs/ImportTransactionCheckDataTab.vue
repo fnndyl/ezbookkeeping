@@ -98,9 +98,15 @@
             <template #item.actualCategoryName="{ item }">
                 <import-category-picker v-if="editingTransaction !== item || item.type === TransactionType.ModifyBalance"
                                         :categories="getQuickCategoryOptions(item)"
+                                        :hide-dropdown="item.type === TransactionType.ModifyBalance"
                                         :disabled="!!disabled || item.type === TransactionType.ModifyBalance || !getQuickCategoryOptions(item).length"
                                         @update:open="onQuickCategoryOpen(item, $event)"
                                         @select="applyQuickCategory(item, $event)">
+                    <template #leading>
+                        <v-icon class="text-error me-2" :icon="mdiAlertOutline"
+                                :title="item.originalCategoryName || tt('Category')"
+                                v-if="item.type !== TransactionType.ModifyBalance && (!item.categoryId || item.categoryId === '0' || !allCategoriesMap[item.categoryId])" />
+                    </template>
                     <div class="d-flex align-center">
                         <span v-if="item.type === TransactionType.ModifyBalance">-</span>
                         <ItemIcon size="24px" :icon-type="getCategoryIconType(allCategoriesMap[item.categoryId]?.iconType)"
@@ -110,10 +116,7 @@
                         <span class="ms-1" v-if="item.type !== TransactionType.ModifyBalance && item.categoryId && item.categoryId !== '0' && allCategoriesMap[item.categoryId]">
                                             {{ allCategoriesMap[item.categoryId]?.name }}
                                         </span>
-                        <div class="text-error font-italic" v-else-if="item.type !== TransactionType.ModifyBalance && (!item.categoryId || item.categoryId === '0' || !allCategoriesMap[item.categoryId])">
-                            <v-icon class="me-1" :icon="mdiAlertOutline"/>
-                            <span>{{ item.originalCategoryName }}</span>
-                        </div>
+                        <span v-else-if="item.type !== TransactionType.ModifyBalance">{{ tt('None') }}</span>
                     </div>
                 </import-category-picker>
                 <div style="width: 260px" v-if="editingTransaction === item && item.type === TransactionType.Expense">
