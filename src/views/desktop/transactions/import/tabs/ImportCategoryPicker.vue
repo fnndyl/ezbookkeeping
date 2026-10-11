@@ -1,22 +1,39 @@
 <template>
-    <v-menu v-model="open" :close-on-content-click="false" :disabled="disabled" max-width="400">
+    <v-menu v-model="open" :close-on-content-click="false" :disabled="disabled" max-width="520">
         <template #activator="{ props: activatorProps }">
             <button type="button" class="d-flex align-center text-start" style="color: inherit"
                     v-bind="activatorProps" :disabled="disabled" :aria-label="tt('Category')" @click.stop>
                 <slot />
             </button>
         </template>
-        <v-card width="360" @click.stop @keydown.esc.stop.prevent="open = false">
+        <v-card width="480" @click.stop @keydown.esc.stop.prevent="open = false">
             <v-text-field ref="searchInput" class="ma-2" density="compact" hide-details
-                          :placeholder="tt('Find category')" :aria-label="tt('Find category')"
+                          :prepend-inner-icon="mdiMagnify" :placeholder="tt('Find category')" :aria-label="tt('Find category')"
                           v-model="search" @keydown="onSearchKeydown" />
-            <v-list ref="resultList" style="max-height: 310px; overflow-y: auto" role="listbox" :aria-label="tt('Category')">
-                <v-list-item v-for="(option, index) in filteredOptions" :key="option.id"
-                             :active="index === highlightedIndex" :title="option.title"
-                             role="option" :aria-selected="index === highlightedIndex"
-                             @click="select(option.id)" />
-                <v-list-item v-if="!filteredOptions.length" :title="tt('No available category')" />
-            </v-list>
+            <div class="import-category-columns" v-if="filteredOptions.length">
+                <v-list class="import-category-list" :aria-label="tt('Category')">
+                    <v-list-item v-for="parent in filteredParents" :key="parent.id"
+                                 :active="parent.id === activeParentId" :title="parent.name"
+                                 @click="browseParent(parent.id)">
+                        <template #prepend>
+                            <ItemIcon class="me-2" :icon-type="getCategoryIconType(parent.iconType)"
+                                      :icon-id="parent.icon" :color="parent.color" />
+                        </template>
+                    </v-list-item>
+                </v-list>
+                <v-list ref="resultList" class="import-category-list" role="listbox" :aria-label="tt('Category')">
+                    <v-list-item v-for="option in activeOptions" :key="option.id"
+                                 :active="option.id === highlightedOption?.id" :title="option.category.name"
+                                 role="option" :aria-selected="option.id === highlightedOption?.id"
+                                 @click="select(option.id)">
+                        <template #prepend>
+                            <ItemIcon class="me-2" :icon-type="getCategoryIconType(option.category.iconType)"
+                                      :icon-id="option.category.icon" :color="option.category.color" />
+                        </template>
+                    </v-list-item>
+                </v-list>
+            </div>
+            <div class="text-body-large mx-4 mt-3 mb-2" v-else>{{ tt('No available category') }}</div>
         </v-card>
     </v-menu>
 </template>
@@ -26,6 +43,8 @@ import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef, watch } from 
 import { VTextField } from 'vuetify/components/VTextField';
 import { VList } from 'vuetify/components/VList';
 import { useI18n } from '@/locales/helpers.ts';
+import { mdiMagnify } from '@mdi/js';
+import { getCategoryIconType } from '@/lib/icon.ts';
 import { NormalizedText } from '@/core/text.ts';
 import type { TransactionCategory } from '@/models/transaction_category.ts';
 
@@ -48,10 +67,25 @@ const filteredOptions = computed(() => {
     return props.categories.filter(parent => !parent.hidden).flatMap(parent =>
         (parent.subCategories || []).filter(category => !category.hidden).map(category => ({
             id: category.id,
+            parentId: parent.id,
+            category,
             title: `${parent.name} → ${category.name}`
         }))
     ).filter(option => NormalizedText.normalizeForSearch(option.title).includes(query));
 });
+
+const highlightedOption = computed(() => filteredOptions.value[highlightedIndex.value]);
+const activeParentId = computed(() => highlightedOption.value?.parentId);
+const filteredParents = computed(() => props.categories.filter(parent =>
+    filteredOptions.value.some(option => option.parentId === parent.id)));
+const activeOptions = computed(() => filteredOptions.value.filter(option => option.parentId === activeParentId.value));
+
+function browseParent(parentId: string): void {
+    const index = filteredOptions.value.findIndex(option => option.parentId === parentId);
+    if (index >= 0) {
+        highlightedIndex.value = index;
+    }
+}
 
 function select(id: string): void {
     if (props.disabled || !filteredOptions.value.some(option => option.id === id)) {
@@ -100,3 +134,15 @@ watch(open, async value => {
     }
 });
 </script>
+
+<style scoped>
+.import-category-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.import-category-list {
+    max-height: 310px;
+    overflow-y: auto;
+}
+</style>
