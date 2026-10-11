@@ -1,7 +1,7 @@
 <template>
     <v-menu v-model="open" :close-on-content-click="false" :disabled="disabled" max-width="520">
         <template #activator="{ props: activatorProps }">
-            <div class="d-flex align-center">
+            <div class="import-category-selection d-flex align-center">
                 <slot name="leading" />
                 <button type="button" class="import-category-activator d-flex align-center text-start"
                         v-bind="activatorProps" :disabled="disabled" :aria-label="tt('Category')" @click.stop>
@@ -143,6 +143,10 @@ watch(open, async value => {
 </script>
 
 <style scoped>
+.import-category-selection {
+    width: 260px;
+}
+
 .import-category-activator {
     appearance: none;
     border: 0;
@@ -152,7 +156,8 @@ watch(open, async value => {
     padding: 0;
     min-height: 28px;
     gap: 8px;
-    width: 260px;
+    flex: 1;
+    min-width: 0;
     cursor: pointer;
 }
 
