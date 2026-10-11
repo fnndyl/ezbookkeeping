@@ -74,12 +74,12 @@
             </template>
             <template #item.valid="{ item }">
                 <v-icon size="small" :class="{ 'text-error': !item.valid }"
-                        :aria-label="editingTransaction === item ? tt('Apply') : tt('Edit')"
+                        :aria-label="editingTransaction === item ? tt('Apply') : tt('Edit Details')"
                         :disabled="!!disabled"
                         :icon="editingTransaction === item ? mdiCheck : mdiPencilOutline"
                         @click="editTransaction(item)">
                 </v-icon>
-                <v-tooltip activator="parent" v-if="!disabled">{{ editingTransaction === item ? tt('Apply') : tt('Edit') }}</v-tooltip>
+                <v-tooltip activator="parent" v-if="!disabled">{{ editingTransaction === item ? tt('Apply') : tt('Edit Details') }}</v-tooltip>
             </template>
             <template #item.time="{ item }">
                 <div class="d-flex align-center">
@@ -103,7 +103,7 @@
                                         @update:open="onQuickCategoryOpen(item, $event)"
                                         @select="applyQuickCategory(item, $event)">
                     <template #leading>
-                        <v-icon class="text-error me-2" :icon="mdiAlertOutline"
+                        <v-icon size="24" class="text-error me-1 flex-shrink-0" :icon="mdiAlertOutline"
                                 :title="item.originalCategoryName || tt('Category')"
                                 v-if="item.type !== TransactionType.ModifyBalance && (!item.categoryId || item.categoryId === '0' || !allCategoriesMap[item.categoryId])" />
                     </template>
