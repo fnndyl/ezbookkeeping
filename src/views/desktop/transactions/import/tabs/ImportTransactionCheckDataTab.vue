@@ -100,7 +100,7 @@
                                         :categories="getQuickCategoryOptions(item)"
                                         :hide-dropdown="item.type === TransactionType.ModifyBalance"
                                         :disabled="!!disabled || item.type === TransactionType.ModifyBalance || !getQuickCategoryOptions(item).length"
-                                        @update:open="onQuickCategoryOpen(item, $event)"
+                                        @update:open="onQuickPickerOpen(item, $event)"
                                         @select="applyQuickCategory(item, $event)">
                     <template #leading>
                         <v-icon size="24" class="text-error me-1 flex-shrink-0" :icon="mdiAlertOutline"
@@ -206,17 +206,29 @@
             </template>
             <template #item.actualSourceAccountName="{ item }">
                 <div class="d-flex align-center" v-if="editingTransaction !== item">
-                    <span v-if="item.sourceAccountId && item.sourceAccountId !== '0' && allAccountsMap[item.sourceAccountId]">{{ allAccountsMap[item.sourceAccountId]?.name }}</span>
-                    <div class="text-error font-italic" v-else>
-                        <v-icon class="me-1" :icon="mdiAlertOutline"/>
-                        <span>{{ item.originalSourceAccountName }}</span>
-                    </div>
-                    <v-icon class="icon-with-direction mx-1" size="13" :icon="mdiArrowRight" v-if="item.type === TransactionType.Transfer"></v-icon>
-                    <span v-if="item.type === TransactionType.Transfer && item.destinationAccountId && item.destinationAccountId !== '0' && allAccountsMap[item.destinationAccountId]">{{allAccountsMap[item.destinationAccountId]?.name }}</span>
-                    <div class="text-error font-italic" v-else-if="item.type === TransactionType.Transfer && (!item.destinationAccountId || item.destinationAccountId === '0' || !allAccountsMap[item.destinationAccountId])">
-                        <v-icon class="me-1" :icon="mdiAlertOutline"/>
-                        <span>{{ item.originalDestinationAccountName }}</span>
-                    </div>
+                    <import-account-picker :accounts="getQuickAccountOptions(item, false)" :disabled="!!disabled || !getQuickAccountOptions(item, false).length"
+                                           :label="getSourceAccountTitle(item)"
+                                           @update:open="onQuickPickerOpen(item, $event)" @select="applyQuickAccount(item, $event, false)">
+                        <template #leading>
+                            <v-icon size="24" class="text-error me-1 flex-shrink-0" :icon="mdiAlertOutline"
+                                    :title="item.originalSourceAccountName || tt('Account')"
+                                    v-if="!item.sourceAccountId || item.sourceAccountId === '0' || !allAccountsMap[item.sourceAccountId]" />
+                        </template>
+                        <span>{{ allAccountsMap[item.sourceAccountId]?.name || tt('None') }}</span>
+                    </import-account-picker>
+                    <v-icon class="icon-with-direction mx-1" size="13" :icon="mdiArrowRight" v-if="item.type === TransactionType.Transfer" />
+                    <import-account-picker v-if="item.type === TransactionType.Transfer"
+                                           :accounts="getQuickAccountOptions(item, true)" :disabled="!!disabled || !getQuickAccountOptions(item, true).length"
+                                           :label="tt('Destination Account')"
+                                           @update:open="onQuickPickerOpen(item, $event)" @select="applyQuickAccount(item, $event, true)">
+                        <template #leading>
+                            <v-icon size="24" class="text-error me-1 flex-shrink-0" :icon="mdiAlertOutline"
+                                    :title="item.originalDestinationAccountName || tt('Destination Account')"
+                                    v-if="!item.destinationAccountId || item.destinationAccountId === '0' || !allAccountsMap[item.destinationAccountId]" />
+                        </template>
+                        <span>{{ allAccountsMap[item.destinationAccountId]?.name || tt('None') }}</span>
+                    </import-account-picker>
+
                 </div>
                 <div class="d-flex align-center" :style="`width: ${item.type === TransactionType.Transfer ? 450 : 200}px`"  v-if="editingTransaction === item">
                     <two-column-select density="compact" variant="plain"
@@ -429,6 +441,7 @@
 </template>
 
 <script setup lang="ts">
+import ImportAccountPicker from './ImportAccountPicker.vue';
 import ImportCategoryPicker from './ImportCategoryPicker.vue';
 import PaginationButtons from '@/components/desktop/PaginationButtons.vue';
 import SnackBar from '@/components/desktop/SnackBar.vue';
@@ -572,7 +585,7 @@ const batchApplyRulesDialog = useTemplateRef<BatchApplyRulesDialogType>('batchAp
 const batchCreateDialog = useTemplateRef<BatchCreateDialogType>('batchCreateDialog');
 
 const editingTransaction = ref<ImportTransaction | null>(null);
-const quickCategoryTransaction = ref<ImportTransaction | null>(null);
+const quickPickerTransaction = ref<ImportTransaction | null>(null);
 const editingTags = ref<string[]>([]);
 const filters = ref<ImportTransactionCheckDataFilter>({
     minDatetime: null,
@@ -631,7 +644,7 @@ const hasVisibleExpenseCategories = computed<boolean>(() => transactionCategorie
 const hasVisibleIncomeCategories = computed<boolean>(() => transactionCategoriesStore.hasVisibleIncomeCategories);
 const hasVisibleTransferCategories = computed<boolean>(() => transactionCategoriesStore.hasVisibleTransferCategories);
 
-const isEditing = computed<boolean>(() => !!editingTransaction.value || !!quickCategoryTransaction.value);
+const isEditing = computed<boolean>(() => !!editingTransaction.value || !!quickPickerTransaction.value);
 const canImport = computed<boolean>(() => selectedImportTransactionCount.value > 0 && selectedInvalidTransactionCount.value < 1);
 
 const filterMenus = computed<ImportTransactionCheckDataMenuGroup[]>(() => [
@@ -1690,6 +1703,26 @@ function selectInvertInThisPage(): void {
     }
 }
 
+function getQuickAccountOptions(transaction: ImportTransaction, destination: boolean): Account[] {
+    const otherId = destination ? transaction.sourceAccountId : transaction.destinationAccountId;
+    return allVisibleAccounts.value.filter(account => transaction.type !== TransactionType.Transfer || account.id !== otherId);
+}
+
+function applyQuickAccount(transaction: ImportTransaction, accountId: string, destination: boolean): void {
+    if (props.disabled || !props.importTransactions?.includes(transaction)
+        || (destination && transaction.type !== TransactionType.Transfer)
+        || !getQuickAccountOptions(transaction, destination).some(account => account.id === accountId)) {
+        return;
+    }
+    if (destination) {
+        transaction.destinationAccountId = accountId;
+    } else {
+        transaction.sourceAccountId = accountId;
+    }
+    updateTransactionData(transaction);
+    quickPickerTransaction.value = null;
+}
+
 function getQuickCategoryOptions(transaction: ImportTransaction): TransactionCategory[] {
     const categoryType = transaction.type === TransactionType.Expense ? CategoryType.Expense
         : transaction.type === TransactionType.Income ? CategoryType.Income
@@ -1697,14 +1730,14 @@ function getQuickCategoryOptions(transaction: ImportTransaction): TransactionCat
     return categoryType === null ? [] : (allCategories.value[categoryType] || []);
 }
 
-function onQuickCategoryOpen(transaction: ImportTransaction, open: boolean): void {
+function onQuickPickerOpen(transaction: ImportTransaction, open: boolean): void {
     if (open) {
         if (editingTransaction.value) {
             editTransaction(editingTransaction.value);
         }
-        quickCategoryTransaction.value = transaction;
-    } else if (quickCategoryTransaction.value === transaction) {
-        quickCategoryTransaction.value = null;
+        quickPickerTransaction.value = transaction;
+    } else if (quickPickerTransaction.value === transaction) {
+        quickPickerTransaction.value = null;
     }
 }
 
@@ -1719,7 +1752,7 @@ function applyQuickCategory(transaction: ImportTransaction, categoryId: string):
     }
     transaction.categoryId = categoryId;
     updateTransactionData(transaction);
-    quickCategoryTransaction.value = null;
+    quickPickerTransaction.value = null;
 }
 
 function editTransaction(transaction: ImportTransaction): void {
@@ -2257,7 +2290,7 @@ function onShowDateRangeError(message: string): void {
 }
 
 function reset(): void {
-    quickCategoryTransaction.value = null;
+    quickPickerTransaction.value = null;
     editingTransaction.value = null;
     editingTags.value = [];
     filters.value.minDatetime = null;
