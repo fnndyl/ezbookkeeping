@@ -96,20 +96,26 @@
                 <v-chip label color="default" variant="outlined" size="x-small" v-else>{{ tt('Unknown') }}</v-chip>
             </template>
             <template #item.actualCategoryName="{ item }">
-                <div class="d-flex align-center" v-if="editingTransaction !== item || item.type === TransactionType.ModifyBalance">
-                    <span v-if="item.type === TransactionType.ModifyBalance">-</span>
-                    <ItemIcon size="24px" :icon-type="getCategoryIconType(allCategoriesMap[item.categoryId]?.iconType)"
-                              :icon-id="allCategoriesMap[item.categoryId]?.icon ?? ''"
-                              :color="allCategoriesMap[item.categoryId]?.color ?? ''"
-                              v-if="item.type !== TransactionType.ModifyBalance && item.categoryId && item.categoryId !== '0' && allCategoriesMap[item.categoryId]"></ItemIcon>
-                    <span class="ms-1" v-if="item.type !== TransactionType.ModifyBalance && item.categoryId && item.categoryId !== '0' && allCategoriesMap[item.categoryId]">
-                                        {{ allCategoriesMap[item.categoryId]?.name }}
-                                    </span>
-                    <div class="text-error font-italic" v-else-if="item.type !== TransactionType.ModifyBalance && (!item.categoryId || item.categoryId === '0' || !allCategoriesMap[item.categoryId])">
-                        <v-icon class="me-1" :icon="mdiAlertOutline"/>
-                        <span>{{ item.originalCategoryName }}</span>
+                <import-category-picker v-if="editingTransaction !== item || item.type === TransactionType.ModifyBalance"
+                                        :categories="getQuickCategoryOptions(item)"
+                                        :disabled="!!disabled || item.type === TransactionType.ModifyBalance || !getQuickCategoryOptions(item).length"
+                                        @update:open="onQuickCategoryOpen(item, $event)"
+                                        @select="applyQuickCategory(item, $event)">
+                    <div class="d-flex align-center">
+                        <span v-if="item.type === TransactionType.ModifyBalance">-</span>
+                        <ItemIcon size="24px" :icon-type="getCategoryIconType(allCategoriesMap[item.categoryId]?.iconType)"
+                                  :icon-id="allCategoriesMap[item.categoryId]?.icon ?? ''"
+                                  :color="allCategoriesMap[item.categoryId]?.color ?? ''"
+                                  v-if="item.type !== TransactionType.ModifyBalance && item.categoryId && item.categoryId !== '0' && allCategoriesMap[item.categoryId]"></ItemIcon>
+                        <span class="ms-1" v-if="item.type !== TransactionType.ModifyBalance && item.categoryId && item.categoryId !== '0' && allCategoriesMap[item.categoryId]">
+                                            {{ allCategoriesMap[item.categoryId]?.name }}
+                                        </span>
+                        <div class="text-error font-italic" v-else-if="item.type !== TransactionType.ModifyBalance && (!item.categoryId || item.categoryId === '0' || !allCategoriesMap[item.categoryId])">
+                            <v-icon class="me-1" :icon="mdiAlertOutline"/>
+                            <span>{{ item.originalCategoryName }}</span>
+                        </div>
                     </div>
-                </div>
+                </import-category-picker>
                 <div style="width: 260px" v-if="editingTransaction === item && item.type === TransactionType.Expense">
                     <two-column-select density="compact" variant="plain"
                                        primary-key-field="id" primary-value-field="id" primary-title-field="name"
@@ -420,6 +426,7 @@
 </template>
 
 <script setup lang="ts">
+import ImportCategoryPicker from './ImportCategoryPicker.vue';
 import PaginationButtons from '@/components/desktop/PaginationButtons.vue';
 import SnackBar from '@/components/desktop/SnackBar.vue';
 import BatchReplaceDialog, { type BatchReplaceDialogDataType } from '../dialogs/BatchReplaceDialog.vue';
@@ -562,6 +569,7 @@ const batchApplyRulesDialog = useTemplateRef<BatchApplyRulesDialogType>('batchAp
 const batchCreateDialog = useTemplateRef<BatchCreateDialogType>('batchCreateDialog');
 
 const editingTransaction = ref<ImportTransaction | null>(null);
+const quickCategoryTransaction = ref<ImportTransaction | null>(null);
 const editingTags = ref<string[]>([]);
 const filters = ref<ImportTransactionCheckDataFilter>({
     minDatetime: null,
@@ -620,7 +628,7 @@ const hasVisibleExpenseCategories = computed<boolean>(() => transactionCategorie
 const hasVisibleIncomeCategories = computed<boolean>(() => transactionCategoriesStore.hasVisibleIncomeCategories);
 const hasVisibleTransferCategories = computed<boolean>(() => transactionCategoriesStore.hasVisibleTransferCategories);
 
-const isEditing = computed<boolean>(() => !!editingTransaction.value);
+const isEditing = computed<boolean>(() => !!editingTransaction.value || !!quickCategoryTransaction.value);
 const canImport = computed<boolean>(() => selectedImportTransactionCount.value > 0 && selectedInvalidTransactionCount.value < 1);
 
 const filterMenus = computed<ImportTransactionCheckDataMenuGroup[]>(() => [
@@ -1679,6 +1687,38 @@ function selectInvertInThisPage(): void {
     }
 }
 
+function getQuickCategoryOptions(transaction: ImportTransaction): TransactionCategory[] {
+    const categoryType = transaction.type === TransactionType.Expense ? CategoryType.Expense
+        : transaction.type === TransactionType.Income ? CategoryType.Income
+        : transaction.type === TransactionType.Transfer ? CategoryType.Transfer : null;
+    return categoryType === null ? [] : (allCategories.value[categoryType] || []);
+}
+
+function onQuickCategoryOpen(transaction: ImportTransaction, open: boolean): void {
+    if (open) {
+        if (editingTransaction.value) {
+            editTransaction(editingTransaction.value);
+        }
+        quickCategoryTransaction.value = transaction;
+    } else if (quickCategoryTransaction.value === transaction) {
+        quickCategoryTransaction.value = null;
+    }
+}
+
+function applyQuickCategory(transaction: ImportTransaction, categoryId: string): void {
+    if (props.disabled || !props.importTransactions?.includes(transaction)) {
+        return;
+    }
+    const allowed = getQuickCategoryOptions(transaction).some(parent => !parent.hidden
+        && parent.subCategories?.some(category => !category.hidden && category.id === categoryId));
+    if (!allowed) {
+        return;
+    }
+    transaction.categoryId = categoryId;
+    updateTransactionData(transaction);
+    quickCategoryTransaction.value = null;
+}
+
 function editTransaction(transaction: ImportTransaction): void {
     if (editingTransaction.value) {
         editingTransaction.value.tagIds = editingTags.value;
@@ -2214,6 +2254,7 @@ function onShowDateRangeError(message: string): void {
 }
 
 function reset(): void {
+    quickCategoryTransaction.value = null;
     editingTransaction.value = null;
     editingTags.value = [];
     filters.value.minDatetime = null;
