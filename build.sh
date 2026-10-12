@@ -277,7 +277,7 @@ build_docker() {
 
     echo "Building docker image \"$docker_tag\" ($RELEASE_TYPE)..."
 
-    docker build . -t "$docker_tag" --build-arg RELEASE_BUILD=$RELEASE
+    docker build . -t "$docker_tag" --build-arg RELEASE_BUILD=$RELEASE --build-arg BUILD_NODE_OPTIONS="${BUILD_NODE_OPTIONS:-"--max-old-space-size=4096"}"
 }
 
 main() {
