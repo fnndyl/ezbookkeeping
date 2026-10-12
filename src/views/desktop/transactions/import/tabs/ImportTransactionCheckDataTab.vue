@@ -19,6 +19,7 @@
             :class="{ 'import-transaction-table': true, 'disabled': !!disabled }"
             :headers="importTransactionHeaders"
             :items="importTransactions"
+            :row-props="getImportTransactionRowProps"
             :hover="true"
             :search="JSON.stringify(filters)"
             :custom-filter="importTransactionsFilter"
@@ -92,7 +93,6 @@
                     </template>
                     {{ editingTransaction === item ? tt('Apply') : tt('Edit Details') }}
                 </v-tooltip>
-                <v-chip class="ms-1" size="x-small" v-if="item.duplicate">{{ tt('Already imported') }}</v-chip>
             </template>
             <template #item.time="{ item }">
                 <div class="d-flex align-center">
@@ -1006,6 +1006,13 @@ const toolMenus = computed<ImportTransactionCheckDataMenu[]>(() => [
         onClick: () => exportData(KnownFileType.SSV)
     }
 ]);
+
+function getImportTransactionRowProps({ item }: { item: ImportTransaction }): Record<string, string | undefined> {
+    return {
+        class: item.duplicate && !allowDuplicates.value ? 'import-duplicate-row' : undefined,
+        title: item.duplicate ? tt('This transaction matches an existing entry') : undefined
+    };
+}
 
 const importTransactionHeaders = computed<object[]>(() => {
     return [
@@ -2433,6 +2440,15 @@ defineExpose({
     td:nth-child(2) {
         padding-inline-start: 0;
     }
+}
+
+.import-transaction-table .import-duplicate-row > td {
+    color: rgba(var(--v-theme-on-surface), 0.5);
+}
+
+.import-transaction-table .import-duplicate-row > td > * {
+    filter: grayscale(1);
+    opacity: 0.6;
 }
 
 .import-transaction-table .v-text-field.v-input.v-input--density-compact:not(.v-textarea),

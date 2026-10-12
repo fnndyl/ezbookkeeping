@@ -7,8 +7,10 @@ and time of day are deliberately excluded. Description whitespace and case are
 significant. Deleted transactions do not match; transfer-in mirror records are
 not counted separately.
 
-Rows marked **Already imported** are excluded by default. **Import duplicate
-transactions** explicitly overrides this exclusion. The usual validity and row
+Duplicate rows appear gray, with a hover tooltip explaining that the transaction
+matches an existing entry. They are excluded by default. **Import duplicate
+transactions** explicitly overrides this exclusion and restores normal row colors.
+The usual validity and row
 selection requirements still apply. Matching-field edits trigger a new check;
 failed checks block importing and offer Retry.
 
@@ -51,8 +53,9 @@ QIF parsing, repeat imports, account-independent matching, explicit override,
 occurrence subsets, stale previews, and concurrent imports. Run it only against
 this disposable container.
 
-For UI verification, upload the same QIF again and confirm **Already imported**
-flags appear before assigning accounts; select all and confirm flagged rows are
-excluded. Edit a description/amount and check that the flags refresh. Enable the
-override to select flagged rows. Check that Import remains disabled during a
+For UI verification, upload the same QIF again and confirm duplicate rows appear
+gray before assigning accounts, with an explanatory hover tooltip; select all
+and confirm duplicate rows are excluded. Edit a description/amount and check
+that the styling refreshes. Enable the override to select duplicate rows.
+Check that Import remains disabled during a
 check or after a failed check, with Retry available.

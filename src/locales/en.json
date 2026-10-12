@@ -1616,6 +1616,7 @@
     "Import duplicate transactions": "Import duplicate transactions",
     "Checking for duplicate transactions": "Checking for duplicate transactions",
     "Already imported": "Already imported",
+    "This transaction matches an existing entry": "This transaction matches an existing entry",
     "Unable to check duplicate transactions": "Unable to check duplicate transactions",
     "Edit Details": "Edit Details",
     "View": "View",
