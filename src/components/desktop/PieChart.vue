@@ -32,6 +32,7 @@ interface DesktopPieChartDataItem extends CommonPieChartDataItem {
 
 interface DesktopPieChartProps extends CommonPieChartProps {
     styleType?: PieChartStyleType;
+    emitClickOnEmphasis?: boolean;
 }
 
 const props = defineProps<DesktopPieChartProps>();
@@ -224,7 +225,10 @@ function clickItem(e: ECElementEvent): void {
 
     if (e.event && e.event.target && e.event.target.currentStates && e.event.target.currentStates[0] && e.event.target.currentStates[0] === 'emphasis') {
         selectedIndex.value = e.dataIndex;
-        return;
+
+        if (!props.emitClickOnEmphasis) {
+            return;
+        }
     }
 
     if (!e.data) {

@@ -209,7 +209,7 @@
                             <span class="statistics-overview-amount ms-3"
                                   :class="statisticsTextColor"
                                   v-if="!initing && categoricalAnalysisData && categoricalAnalysisData.items && categoricalAnalysisData.items.length">
-                                {{ getDisplayAmount(categoricalAnalysisData.value, defaultCurrency) }}
+                                {{ getDisplayAmount(pieChartTotalAmount ?? categoricalAnalysisData.value, defaultCurrency) }}
                             </span>
                             <v-skeleton-loader class="skeleton-no-margin ms-3 mb-2"
                                                width="120px" type="text" :loading="true"
@@ -242,7 +242,13 @@
                             />
                         </v-card-text>
 
-                        <v-card-text class="py-0" :class="{ 'readonly': loading }" v-if="queryAnalysisType === StatisticsAnalysisType.CategoricalAnalysis && !isQuerySpecialChartType && query.categoricalChartType === CategoricalChartType.Pie.type">
+                        <v-card-text class="py-0 statistics-pie-chart-content" :class="{ 'readonly': loading }" v-if="queryAnalysisType === StatisticsAnalysisType.CategoricalAnalysis && !isQuerySpecialChartType && query.categoricalChartType === CategoricalChartType.Pie.type">
+                            <div class="statistics-pie-drilldown-header" v-if="drilldownPrimaryCategory">
+                                <span class="statistics-pie-drilldown-title">{{ drilldownPrimaryCategory.name }}</span>
+                                <v-btn class="statistics-pie-drilldown-button" variant="outlined" color="primary" rounded="lg" size="large" :prepend-icon="mdiArrowLeft" @click="drilldownPrimaryCategoryId = null">
+                                    {{ tt('Back') }}
+                                </v-btn>
+                            </div>
                             <pie-chart
                                 :items="[
                                     { id: '1', name: '---', value: parseBigDecimal(60), color: '7c7c7f' },
@@ -255,11 +261,12 @@
                                 v-if="initing"
                             />
                             <pie-chart
-                                :items="categoricalAnalysisData && categoricalAnalysisData.items && categoricalAnalysisData.items.length ? categoricalAnalysisData.items : []"
+                                :items="pieChartItems"
                                 :value-type="ChartValueType.Amount"
                                 :show-value="showAmountInChart"
                                 :show-percent="showPercentInCategoricalChart"
                                 :enable-click-item="true"
+                                :emit-click-on-emphasis="query.chartDataType === ChartDataType.ExpenseByPrimaryCategory.type"
                                 :default-currency="defaultCurrency"
                                 v-else-if="!initing"
                                 @click="onClickPieChartItem"
@@ -482,7 +489,7 @@ import AccountFilterSettingsDialog from '@/views/desktop/common/dialogs/AccountF
 import CategoryFilterSettingsDialog from '@/views/desktop/common/dialogs/CategoryFilterSettingsDialog.vue';
 import TransactionTagFilterSettingsDialog from '@/views/desktop/common/dialogs/TransactionTagFilterSettingsDialog.vue';
 
-import { ref, computed, useTemplateRef } from 'vue';
+import { ref, computed, useTemplateRef, watch } from 'vue';
 import { useRouter, onBeforeRouteUpdate } from 'vue-router';
 import { useTheme } from 'vuetify';
 
@@ -507,6 +514,7 @@ import {
     ChartDateAggregationType,
     ExportMermaidChartType
 } from '@/core/statistics.ts';
+import { TransactionCategoricalOverviewAnalysisDataItemType } from '@/models/transaction.ts';
 
 import {
     isDefined,
@@ -637,8 +645,50 @@ const showCustomMonthRangeDialog = ref<boolean>(false);
 const showFilterAccountDialog = ref<boolean>(false);
 const showFilterCategoryDialog = ref<boolean>(false);
 const showFilterTagDialog = ref<boolean>(false);
+const drilldownPrimaryCategoryId = ref<string | null>(null);
+
+watch(() => [query.value.chartDataType, query.value.categoricalChartType], ([chartDataType, chartType]) => {
+    if (chartDataType !== ChartDataType.ExpenseByPrimaryCategory.type || chartType !== CategoricalChartType.Pie.type) {
+        drilldownPrimaryCategoryId.value = null;
+    }
+});
 
 const isDarkMode = computed<boolean>(() => theme.global.name.value === ThemeType.Dark);
+
+const drilldownPrimaryCategory = computed(() => {
+    if (!drilldownPrimaryCategoryId.value || !categoricalOverviewAnalysisData.value) {
+        return null;
+    }
+
+    return categoricalOverviewAnalysisData.value.items.find(item =>
+        item.type === TransactionCategoricalOverviewAnalysisDataItemType.ExpenseByPrimaryCategory && item.id === drilldownPrimaryCategoryId.value
+    ) ?? null;
+});
+
+const pieChartItems = computed(() => {
+    if (!drilldownPrimaryCategory.value || query.value.chartDataType !== ChartDataType.ExpenseByPrimaryCategory.type) {
+        return categoricalAnalysisData.value?.items ?? [];
+    }
+
+    const secondaryCategories = categoricalOverviewAnalysisData.value?.items.filter(item =>
+        item.type === TransactionCategoricalOverviewAnalysisDataItemType.ExpenseBySecondaryCategory &&
+        transactionCategoriesStore.allTransactionCategoriesMap[item.id]?.parentId === drilldownPrimaryCategoryId.value
+    ) ?? [];
+    const total = secondaryCategories.reduce((sum, item) => item.value.isPositive() ? sum.add(item.value) : sum, parseBigDecimal(0));
+
+    return secondaryCategories.map(item => ({
+        id: item.id,
+        name: item.name,
+        value: item.value,
+        color: transactionCategoriesStore.allTransactionCategoriesMap[item.id]?.color,
+        hidden: item.hidden,
+        percent: item.value.isPositive() && total.isPositive() ? item.value.divide(total).multiply(100).toDoubleNumber() : 0
+    }));
+});
+
+const pieChartTotalAmount = computed(() => drilldownPrimaryCategory.value && query.value.chartDataType === ChartDataType.ExpenseByPrimaryCategory.type && query.value.categoricalChartType === CategoricalChartType.Pie.type
+    ? drilldownPrimaryCategory.value.value
+    : categoricalAnalysisData.value?.value);
 
 const statisticsDataHasData = computed<boolean>(() => {
     if (analysisType.value === StatisticsAnalysisType.CategoricalAnalysis) {
@@ -1299,6 +1349,11 @@ function onClickSankeyChartItem(sourceItemType: 'account' | 'category', sourceIt
 }
 
 function onClickPieChartItem(item: Record<string, unknown>): void {
+    if (query.value.chartDataType === ChartDataType.ExpenseByPrimaryCategory.type && !drilldownPrimaryCategoryId.value) {
+        drilldownPrimaryCategoryId.value = item['id'] as string;
+        return;
+    }
+
     router.push(getTransactionItemLinkUrl(item['id'] as string));
 }
 
@@ -1357,6 +1412,36 @@ init(props);
 .statistics-subtitle {
     font-size: 1rem;
     line-height: 1.75rem
+}
+
+.statistics-pie-chart-content {
+    position: relative;
+}
+
+.statistics-pie-drilldown-header {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    inset-inline: 0;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    pointer-events: none;
+}
+
+.statistics-pie-drilldown-title {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.1rem;
+    line-height: 2.5rem;
+    pointer-events: none;
+}
+
+.statistics-pie-drilldown-button {
+    pointer-events: auto;
+    margin-inline-end: 1rem;
+    transform: translateY(-2.75rem);
 }
 
 .statistics-overview-empty-tip {
