@@ -82,11 +82,11 @@
                             v-model="item.selected"></v-checkbox>
             </template>
             <template #item.valid="{ item }">
-                <v-tooltip :disabled="!!disabled">
+                <v-tooltip :disabled="isTransactionInteractionDisabled(item)">
                     <template #activator="{ props: tooltipProps }">
                         <v-icon v-bind="tooltipProps" size="small" :class="{ 'text-error': !item.valid }"
                                 :aria-label="editingTransaction === item ? tt('Apply') : tt('Edit Details')"
-                                :disabled="!!disabled"
+                                :disabled="isTransactionInteractionDisabled(item)"
                                 :icon="editingTransaction === item ? mdiCheck : mdiPencilOutline"
                                 @click="editTransaction(item)">
                         </v-icon>
@@ -112,7 +112,7 @@
                 <import-category-picker v-if="editingTransaction !== item || item.type === TransactionType.ModifyBalance"
                                         :categories="getQuickCategoryOptions(item)"
                                         :hide-dropdown="item.type === TransactionType.ModifyBalance"
-                                        :disabled="!!disabled || item.type === TransactionType.ModifyBalance || !getQuickCategoryOptions(item).length"
+                                        :disabled="isTransactionInteractionDisabled(item) || item.type === TransactionType.ModifyBalance || !getQuickCategoryOptions(item).length"
                                         @update:open="onQuickPickerOpen(item, $event)"
                                         @select="applyQuickCategory(item, $event)">
                     <template #leading>
@@ -140,7 +140,7 @@
                                        secondary-key-field="id" secondary-value-field="id" secondary-title-field="name"
                                        secondary-icon-field="icon" secondary-icon-type-field="iconType" secondary-icon-type="category" secondary-color-field="color"
                                        secondary-hidden-field="hidden"
-                                       :disabled="!!disabled || !hasVisibleExpenseCategories"
+                                       :disabled="isTransactionInteractionDisabled(item) || !hasVisibleExpenseCategories"
                                        :enable-filter="true" :filter-placeholder="tt('Find category')" :filter-no-items-text="tt('No available category')"
                                        :show-selection-primary-text="true"
                                        :custom-selection-primary-text="getTransactionPrimaryCategoryName(item.categoryId, allCategories[CategoryType.Expense])"
@@ -158,7 +158,7 @@
                                        secondary-key-field="id" secondary-value-field="id" secondary-title-field="name"
                                        secondary-icon-field="icon" secondary-icon-type-field="iconType" secondary-icon-type="category" secondary-color-field="color"
                                        secondary-hidden-field="hidden"
-                                       :disabled="!!disabled || !hasVisibleIncomeCategories"
+                                       :disabled="isTransactionInteractionDisabled(item) || !hasVisibleIncomeCategories"
                                        :enable-filter="true" :filter-placeholder="tt('Find category')" :filter-no-items-text="tt('No available category')"
                                        :show-selection-primary-text="true"
                                        :custom-selection-primary-text="getTransactionPrimaryCategoryName(item.categoryId, allCategories[CategoryType.Income])"
@@ -176,7 +176,7 @@
                                        secondary-key-field="id" secondary-value-field="id" secondary-title-field="name"
                                        secondary-icon-field="icon" secondary-icon-type-field="iconType" secondary-icon-type="category" secondary-color-field="color"
                                        secondary-hidden-field="hidden"
-                                       :disabled="!!disabled || !hasVisibleTransferCategories"
+                                       :disabled="isTransactionInteractionDisabled(item) || !hasVisibleTransferCategories"
                                        :enable-filter="true" :filter-placeholder="tt('Find category')" :filter-no-items-text="tt('No available category')"
                                        :show-selection-primary-text="true"
                                        :custom-selection-primary-text="getTransactionPrimaryCategoryName(item.categoryId, allCategories[CategoryType.Transfer])"
@@ -203,7 +203,7 @@
                                   persistent-placeholder
                                   :currency="getTransactionSourceAccountCurrency(item)"
                                   :show-currency="true"
-                                  :disabled="!!disabled"
+                                  :disabled="isTransactionInteractionDisabled(item)"
                                   :placeholder="tt('Amount')"
                                   v-model="item.sourceAmount"/>
                     <v-icon class="icon-with-direction mx-1" size="13" :icon="mdiArrowRight" v-if="item.type === TransactionType.Transfer && item.sourceAccountId !== item.destinationAccountId"></v-icon>
@@ -211,7 +211,7 @@
                                   persistent-placeholder
                                   :currency="getTransactionDestinationAccountCurrency(item)"
                                   :show-currency="true"
-                                  :disabled="!!disabled"
+                                  :disabled="isTransactionInteractionDisabled(item)"
                                   :placeholder="tt('Transfer In Amount')"
                                   v-model="item.destinationAmount"
                                   v-if="item.type === TransactionType.Transfer && item.sourceAccountId !== item.destinationAccountId"/>
@@ -219,7 +219,7 @@
             </template>
             <template #item.actualSourceAccountName="{ item }">
                 <div class="d-flex align-center" v-if="editingTransaction !== item">
-                    <import-account-picker :groups="getQuickAccountGroups(item, false)" :disabled="!!disabled || !getQuickAccountOptions(item, false).length"
+                    <import-account-picker :groups="getQuickAccountGroups(item, false)" :disabled="isTransactionInteractionDisabled(item) || !getQuickAccountOptions(item, false).length"
                                            :label="getSourceAccountTitle(item)"
                                            @update:open="onQuickPickerOpen(item, $event)" @select="applyQuickAccount(item, $event, false)">
                         <template #leading>
@@ -231,7 +231,7 @@
                     </import-account-picker>
                     <v-icon class="icon-with-direction mx-1" size="13" :icon="mdiArrowRight" v-if="item.type === TransactionType.Transfer" />
                     <import-account-picker v-if="item.type === TransactionType.Transfer"
-                                           :groups="getQuickAccountGroups(item, true)" :disabled="!!disabled || !getQuickAccountOptions(item, true).length"
+                                           :groups="getQuickAccountGroups(item, true)" :disabled="isTransactionInteractionDisabled(item) || !getQuickAccountOptions(item, true).length"
                                            :label="tt('Destination Account')"
                                            @update:open="onQuickPickerOpen(item, $event)" @select="applyQuickAccount(item, $event, true)">
                         <template #leading>
@@ -253,7 +253,7 @@
                                        secondary-key-field="id" secondary-value-field="id"
                                        secondary-title-field="name" secondary-footer-field="displayBalance"
                                        secondary-icon-field="icon" secondary-icon-type-field="iconType" secondary-icon-type="account" secondary-color-field="color"
-                                       :disabled="!!disabled || !allVisibleAccounts.length"
+                                       :disabled="isTransactionInteractionDisabled(item) || !allVisibleAccounts.length"
                                        :enable-filter="true" :filter-placeholder="tt('Find account')" :filter-no-items-text="tt('No available account')"
                                        :custom-selection-primary-text="getSourceAccountDisplayName(item)"
                                        :placeholder="getSourceAccountTitle(item)"
@@ -270,7 +270,7 @@
                                        secondary-key-field="id" secondary-value-field="id"
                                        secondary-title-field="name" secondary-footer-field="displayBalance"
                                        secondary-icon-field="icon" secondary-icon-type-field="iconType" secondary-icon-type="account" secondary-color-field="color"
-                                       :disabled="!!disabled || !allVisibleAccounts.length"
+                                       :disabled="isTransactionInteractionDisabled(item) || !allVisibleAccounts.length"
                                        :enable-filter="true" :filter-placeholder="tt('Find account')" :filter-no-items-text="tt('No available account')"
                                        :custom-selection-primary-text="getDestinationAccountDisplayName(item)"
                                        :placeholder="tt('Destination Account')"
@@ -307,7 +307,7 @@
                         chips
                         closable-chips
                         density="compact" variant="plain"
-                        :disabled="!!disabled"
+                        :disabled="isTransactionInteractionDisabled(item)"
                         :placeholder="tt('None')"
                         :items="allTagsWithGroupHeader"
                         :no-data-text="tt('No available tag')"
@@ -354,7 +354,7 @@
                                   density="compact" variant="plain"
                                   persistent-placeholder
                                   :placeholder="tt('Description')"
-                                  :disabled="!!disabled"
+                                  :disabled="isTransactionInteractionDisabled(item)"
                                   v-model="item.comment">
                         <v-tooltip activator="parent" v-if="item.comment && item.comment.length > TRANSACTION_MAX_COMMENT_LENGTH">
                             {{ getTransactionDescriptionTooltip(item) }}
@@ -1006,6 +1006,10 @@ const toolMenus = computed<ImportTransactionCheckDataMenu[]>(() => [
         onClick: () => exportData(KnownFileType.SSV)
     }
 ]);
+
+function isTransactionInteractionDisabled(transaction: ImportTransaction): boolean {
+    return !!props.disabled || (transaction.duplicate && !allowDuplicates.value);
+}
 
 function getImportTransactionRowProps({ item }: { item: ImportTransaction }): Record<string, string | undefined> {
     return {
@@ -1745,7 +1749,7 @@ function getQuickAccountGroups(transaction: ImportTransaction, destination: bool
 
 function applyQuickAccount(transaction: ImportTransaction, accountId: string, destination: boolean): void {
     const currentTransaction = props.importTransactions?.find(item => item.index === transaction.index);
-    if (props.disabled || !currentTransaction
+    if (!currentTransaction || isTransactionInteractionDisabled(currentTransaction)
         || (destination && transaction.type !== TransactionType.Transfer)
         || !getQuickAccountOptions(transaction, destination).some(account => account.id === accountId)) {
         return;
@@ -1768,6 +1772,7 @@ function getQuickCategoryOptions(transaction: ImportTransaction): TransactionCat
 
 function onQuickPickerOpen(transaction: ImportTransaction, open: boolean): void {
     if (open) {
+        if (isTransactionInteractionDisabled(transaction)) return;
         if (editingTransaction.value) {
             editTransaction(editingTransaction.value);
         }
@@ -1779,7 +1784,7 @@ function onQuickPickerOpen(transaction: ImportTransaction, open: boolean): void 
 
 function applyQuickCategory(transaction: ImportTransaction, categoryId: string): void {
     const currentTransaction = props.importTransactions?.find(item => item.index === transaction.index);
-    if (props.disabled || !currentTransaction) {
+    if (!currentTransaction || isTransactionInteractionDisabled(currentTransaction)) {
         return;
     }
     const allowed = getQuickCategoryOptions(transaction).some(parent => !parent.hidden
@@ -1793,6 +1798,8 @@ function applyQuickCategory(transaction: ImportTransaction, categoryId: string):
 }
 
 function editTransaction(transaction: ImportTransaction): void {
+    if (isTransactionInteractionDisabled(transaction)) return;
+
     if (editingTransaction.value) {
         editingTransaction.value.tagIds = editingTags.value;
         updateTransactionData(editingTransaction.value);
@@ -2381,6 +2388,16 @@ function scheduleDuplicateCheck(): void {
         }
     }, 250);
 }
+
+// A pending duplicate check can identify a row while its details are open.
+watch(() => editingTransaction.value?.duplicate && !allowDuplicates.value, excluded => {
+    if (excluded && editingTransaction.value) {
+        editingTransaction.value.tagIds = editingTags.value;
+        updateTransactionData(editingTransaction.value);
+        editingTags.value = [];
+        editingTransaction.value = null;
+    }
+});
 
 watch(() => props.importTransactions?.map(transaction => [transaction.index, transaction.type, transaction.time,
     transaction.utcOffset, transaction.sourceAmount, transaction.comment]), scheduleDuplicateCheck, { immediate: true, flush: 'sync' });

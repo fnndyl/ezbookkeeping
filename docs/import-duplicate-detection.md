@@ -10,6 +10,8 @@ not counted separately.
 Duplicate rows appear gray, with a hover tooltip explaining that the transaction
 matches an existing entry. They are excluded by default. **Import duplicate
 transactions** explicitly overrides this exclusion and restores normal row colors.
+Excluded duplicate rows cannot be edited using the pencil or quick dropdowns;
+enabling duplicate imports restores those interactions.
 The usual validity and row
 selection requirements still apply. Matching-field edits trigger a new check;
 failed checks block importing and offer Retry.
