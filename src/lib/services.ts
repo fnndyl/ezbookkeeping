@@ -1,3 +1,4 @@
+import type { ImportDuplicateCandidate, ImportDuplicateMatch } from '@/models/imported_transaction.ts';
 import axios, { type AxiosRequestConfig, type AxiosRequestHeaders, type AxiosResponse } from 'axios';
 
 import type { ApiResponse } from '@/core/api.ts';
@@ -762,6 +763,9 @@ export default {
             timeout: timeout,
             cancelableUuid: cancelableUuid
         } as ApiRequestConfig);
+    },
+    checkImportDuplicates: (transactions: ImportDuplicateCandidate[]): ApiResponsePromise<ImportDuplicateMatch[]> => {
+        return axios.post<ApiResponse<ImportDuplicateMatch[]>>('v1/transactions/check_import_duplicates.json', { transactions });
     },
     importTransactions: (req: TransactionImportRequest): ApiResponsePromise<number> => {
         return axios.post<ApiResponse<number>>('v1/transactions/import.json', req, {

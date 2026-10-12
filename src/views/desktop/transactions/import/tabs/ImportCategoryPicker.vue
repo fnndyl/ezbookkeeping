@@ -144,7 +144,7 @@ watch(open, async value => {
 
 <style scoped>
 .import-category-selection {
-    width: 260px;
+    width: 234px;
 }
 
 .import-category-activator {

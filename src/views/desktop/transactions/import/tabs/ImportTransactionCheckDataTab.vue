@@ -1,5 +1,13 @@
 <template>
     <div class="import-transaction-table-container d-flex flex-column">
+        <div class="d-flex align-center mx-3">
+            <v-checkbox density="compact" hide-details :label="tt('Import duplicate transactions')"
+                        :disabled="!!disabled || isEditing" v-model="allowDuplicates" />
+            <span class="ms-3" v-if="duplicateCheckPending">{{ tt('Checking for duplicate transactions') }}</span>
+            <v-btn class="ms-3" variant="text" v-if="duplicateCheckError" :disabled="!!disabled" @click="scheduleDuplicateCheck">
+                {{ tt('Unable to check duplicate transactions') }} — {{ tt('Retry') }}
+            </v-btn>
+        </div>
         <v-data-table
             fixed-header
             fixed-footer
@@ -67,19 +75,24 @@
                 </v-checkbox>
             </template>
             <template #item.data-table-select="{ item }">
-                <v-checkbox density="compact"
+                <v-checkbox density="compact" hide-details width="28"
                             :color="!item.valid ? 'error' : 'primary'"
-                            :disabled="!!disabled"
+                            :disabled="!!disabled || (item.duplicate && !allowDuplicates)"
                             v-model="item.selected"></v-checkbox>
             </template>
             <template #item.valid="{ item }">
-                <v-icon size="small" :class="{ 'text-error': !item.valid }"
-                        :aria-label="editingTransaction === item ? tt('Apply') : tt('Edit Details')"
-                        :disabled="!!disabled"
-                        :icon="editingTransaction === item ? mdiCheck : mdiPencilOutline"
-                        @click="editTransaction(item)">
-                </v-icon>
-                <v-tooltip activator="parent" v-if="!disabled">{{ editingTransaction === item ? tt('Apply') : tt('Edit Details') }}</v-tooltip>
+                <v-tooltip :disabled="!!disabled">
+                    <template #activator="{ props: tooltipProps }">
+                        <v-icon v-bind="tooltipProps" size="small" :class="{ 'text-error': !item.valid }"
+                                :aria-label="editingTransaction === item ? tt('Apply') : tt('Edit Details')"
+                                :disabled="!!disabled"
+                                :icon="editingTransaction === item ? mdiCheck : mdiPencilOutline"
+                                @click="editTransaction(item)">
+                        </v-icon>
+                    </template>
+                    {{ editingTransaction === item ? tt('Apply') : tt('Edit Details') }}
+                </v-tooltip>
+                <v-chip class="ms-1" size="x-small" v-if="item.duplicate">{{ tt('Already imported') }}</v-chip>
             </template>
             <template #item.time="{ item }">
                 <div class="d-flex align-center">
@@ -119,7 +132,7 @@
                         <span v-else-if="item.type !== TransactionType.ModifyBalance">{{ tt('None') }}</span>
                     </div>
                 </import-category-picker>
-                <div style="width: 260px" v-if="editingTransaction === item && item.type === TransactionType.Expense">
+                <div style="width: 234px" v-if="editingTransaction === item && item.type === TransactionType.Expense">
                     <two-column-select density="compact" variant="plain"
                                        primary-key-field="id" primary-value-field="id" primary-title-field="name"
                                        primary-icon-field="icon" primary-icon-type-field="iconType" primary-icon-type="category" primary-color-field="color"
@@ -137,7 +150,7 @@
                                        v-model="item.categoryId">
                     </two-column-select>
                 </div>
-                <div style="width: 260px" v-if="editingTransaction === item && item.type === TransactionType.Income">
+                <div style="width: 234px" v-if="editingTransaction === item && item.type === TransactionType.Income">
                     <two-column-select density="compact" variant="plain"
                                        primary-key-field="id" primary-value-field="id" primary-title-field="name"
                                        primary-icon-field="icon" primary-icon-type-field="iconType" primary-icon-type="category" primary-color-field="color"
@@ -155,7 +168,7 @@
                                        v-model="item.categoryId">
                     </two-column-select>
                 </div>
-                <div style="width: 260px" v-if="editingTransaction === item && item.type === TransactionType.Transfer">
+                <div style="width: 234px" v-if="editingTransaction === item && item.type === TransactionType.Transfer">
                     <two-column-select density="compact" variant="plain"
                                        primary-key-field="id" primary-value-field="id" primary-title-field="name"
                                        primary-icon-field="icon" primary-icon-type-field="iconType" primary-icon-type="category" primary-color-field="color"
@@ -231,7 +244,7 @@
 
                 </div>
                 <div class="d-flex align-center" v-if="editingTransaction === item">
-                    <two-column-select density="compact" variant="plain" style="width: 260px; flex: 0 0 260px"
+                    <two-column-select density="compact" variant="plain" style="width: 234px; flex: 0 0 234px"
                                        primary-key-field="id" primary-value-field="category"
                                        primary-title-field="name" primary-footer-field="displayBalance"
                                        primary-icon-field="icon" primary-icon-type-field="iconType" primary-icon-type="account"
@@ -248,7 +261,7 @@
                                        v-model="item.sourceAccountId">
                     </two-column-select>
                     <v-icon class="icon-with-direction mx-1" size="13" :icon="mdiArrowRight" v-if="item.type === TransactionType.Transfer"></v-icon>
-                    <two-column-select density="compact" variant="plain" style="width: 260px; flex: 0 0 260px"
+                    <two-column-select density="compact" variant="plain" style="width: 234px; flex: 0 0 234px"
                                        primary-key-field="id" primary-value-field="category"
                                        primary-title-field="name" primary-footer-field="displayBalance"
                                        primary-icon-field="icon" primary-icon-type-field="iconType" primary-icon-type="account"
@@ -441,6 +454,7 @@
 </template>
 
 <script setup lang="ts">
+import services from '@/lib/services.ts';
 import ImportAccountPicker from './ImportAccountPicker.vue';
 import ImportCategoryPicker from './ImportCategoryPicker.vue';
 import PaginationButtons from '@/components/desktop/PaginationButtons.vue';
@@ -449,7 +463,7 @@ import BatchReplaceDialog, { type BatchReplaceDialogDataType } from '../dialogs/
 import BatchApplyRulesDialog from '../dialogs/BatchApplyRulesDialog.vue';
 import BatchCreateDialog, { type BatchCreateDialogDataType } from '../dialogs/BatchCreateDialog.vue';
 
-import { ref, computed, useTemplateRef, watch } from 'vue';
+import { ref, computed, useTemplateRef, watch, onBeforeUnmount } from 'vue';
 
 import { useI18n } from '@/locales/helpers.ts';
 import { useTransactionTagSelectionBase } from '@/components/base/TransactionTagSelectionBase.ts';
@@ -585,6 +599,11 @@ const batchApplyRulesDialog = useTemplateRef<BatchApplyRulesDialogType>('batchAp
 const batchCreateDialog = useTemplateRef<BatchCreateDialogType>('batchCreateDialog');
 
 const editingTransaction = ref<ImportTransaction | null>(null);
+const allowDuplicates = ref(false);
+const duplicateCheckPending = ref(true);
+const duplicateCheckError = ref(false);
+let duplicateCheckVersion = 0;
+let duplicateCheckTimer: ReturnType<typeof setTimeout> | undefined;
 const quickPickerTransaction = ref<ImportTransaction | null>(null);
 const editingTags = ref<string[]>([]);
 const filters = ref<ImportTransactionCheckDataFilter>({
@@ -645,7 +664,7 @@ const hasVisibleIncomeCategories = computed<boolean>(() => transactionCategories
 const hasVisibleTransferCategories = computed<boolean>(() => transactionCategoriesStore.hasVisibleTransferCategories);
 
 const isEditing = computed<boolean>(() => !!editingTransaction.value || !!quickPickerTransaction.value);
-const canImport = computed<boolean>(() => selectedImportTransactionCount.value > 0 && selectedInvalidTransactionCount.value < 1);
+const canImport = computed<boolean>(() => !duplicateCheckPending.value && !duplicateCheckError.value && selectedImportTransactionCount.value > 0 && selectedInvalidTransactionCount.value < 1);
 
 const filterMenus = computed<ImportTransactionCheckDataMenuGroup[]>(() => [
     {
@@ -1056,7 +1075,7 @@ const selectedImportTransactionCount = computed<number>(() => {
     }
 
     for (const importTransaction of props.importTransactions) {
-        if (importTransaction.selected) {
+        if (importTransaction.selected && (!importTransaction.duplicate || allowDuplicates.value)) {
             count++;
         }
     }
@@ -1120,7 +1139,7 @@ const selectedInvalidTransactionCount = computed<number>(() => {
     }
 
     for (const importTransaction of props.importTransactions) {
-        if (!importTransaction.valid && importTransaction.selected) {
+        if (!importTransaction.valid && importTransaction.selected && (!importTransaction.duplicate || allowDuplicates.value)) {
             count++;
         }
     }
@@ -1128,8 +1147,9 @@ const selectedInvalidTransactionCount = computed<number>(() => {
     return count;
 });
 
-const anyButNotAllTransactionSelected = computed<boolean>(() => !!props.importTransactions && selectedImportTransactionCount.value > 0 && selectedImportTransactionCount.value !== props.importTransactions.length);
-const allTransactionSelected = computed<boolean>(() => !!props.importTransactions && selectedImportTransactionCount.value === props.importTransactions.length);
+const selectableTransactionCount = computed(() => props.importTransactions?.filter(transaction => !transaction.duplicate || allowDuplicates.value).length || 0);
+const anyButNotAllTransactionSelected = computed<boolean>(() => selectedImportTransactionCount.value > 0 && selectedImportTransactionCount.value !== selectableTransactionCount.value);
+const allTransactionSelected = computed<boolean>(() => selectableTransactionCount.value > 0 && selectedImportTransactionCount.value === selectableTransactionCount.value);
 
 const allUsedCategoryNames = computed<string[]>(() => {
     if (!props.importTransactions || props.importTransactions.length < 1) {
@@ -1620,7 +1640,7 @@ function selectAllValid(): void {
 
     for (const importTransaction of props.importTransactions) {
         if (importTransaction.valid && isTransactionDisplayed(importTransaction)) {
-            importTransaction.selected = true;
+            importTransaction.selected = !importTransaction.duplicate || allowDuplicates.value;
         }
     }
 }
@@ -1632,7 +1652,7 @@ function selectAllInvalid(): void {
 
     for (const importTransaction of props.importTransactions) {
         if (!importTransaction.valid && isTransactionDisplayed(importTransaction)) {
-            importTransaction.selected = true;
+            importTransaction.selected = !importTransaction.duplicate || allowDuplicates.value;
         }
     }
 }
@@ -1644,7 +1664,7 @@ function selectAll(): void {
 
     for (const importTransaction of props.importTransactions) {
         if (isTransactionDisplayed(importTransaction)) {
-            importTransaction.selected = true;
+            importTransaction.selected = !importTransaction.duplicate || allowDuplicates.value;
         }
     }
 }
@@ -1668,14 +1688,14 @@ function selectInvert(): void {
 
     for (const importTransaction of props.importTransactions) {
         if (isTransactionDisplayed(importTransaction)) {
-            importTransaction.selected = !importTransaction.selected;
+            importTransaction.selected = !importTransaction.selected && (!importTransaction.duplicate || allowDuplicates.value);
         }
     }
 }
 
 function selectAllInThisPage(): void {
     for (const importTransaction of currentPageTransactions.value) {
-        importTransaction.selected = true;
+        importTransaction.selected = !importTransaction.duplicate || allowDuplicates.value;
     }
 }
 
@@ -1699,7 +1719,7 @@ function clearSelectedTransactionsNotDisplayed(): void {
 
 function selectInvertInThisPage(): void {
     for (const importTransaction of currentPageTransactions.value) {
-        importTransaction.selected = !importTransaction.selected;
+        importTransaction.selected = !importTransaction.selected && (!importTransaction.duplicate || allowDuplicates.value);
     }
 }
 
@@ -1769,6 +1789,7 @@ function editTransaction(transaction: ImportTransaction): void {
     if (editingTransaction.value) {
         editingTransaction.value.tagIds = editingTags.value;
         updateTransactionData(editingTransaction.value);
+        scheduleDuplicateCheck();
     }
 
     if (editingTransaction.value === transaction) {
@@ -2300,6 +2321,8 @@ function onShowDateRangeError(message: string): void {
 }
 
 function reset(): void {
+    allowDuplicates.value = false;
+    scheduleDuplicateCheck();
     quickPickerTransaction.value = null;
     editingTransaction.value = null;
     editingTags.value = [];
@@ -2318,6 +2341,47 @@ function setCountPerPage(count: number): void {
     countPerPage.value = count;
 }
 
+// Only matching fields trigger a check; account/category changes cannot change
+// a fingerprint. Versioning discards stale responses after edits or new uploads.
+function scheduleDuplicateCheck(): void {
+    const version = ++duplicateCheckVersion;
+    clearTimeout(duplicateCheckTimer);
+    duplicateCheckPending.value = true;
+    duplicateCheckError.value = false;
+    duplicateCheckTimer = setTimeout(async () => {
+        const rows = props.importTransactions || [];
+        const candidates = rows.map(transaction => ({
+            type: transaction.type, time: transaction.time, utcOffset: transaction.utcOffset,
+            amount: transaction.sourceAmount, comment: transaction.comment || ''
+        }));
+        if (!rows.length) {
+            duplicateCheckPending.value = false;
+            return;
+        }
+        try {
+            const response = await services.checkImportDuplicates(candidates);
+            const matches = response.data?.result;
+            if (version !== duplicateCheckVersion) return;
+            if (!response.data?.success || !matches || matches.length !== rows.length) throw new Error('Invalid duplicate check response');
+            rows.forEach((transaction, index) => {
+                transaction.duplicate = matches[index]!.duplicate;
+                transaction.duplicateOccurrence = matches[index]!.occurrence;
+            });
+        } catch {
+            if (version === duplicateCheckVersion) duplicateCheckError.value = true;
+        } finally {
+            if (version === duplicateCheckVersion) duplicateCheckPending.value = false;
+        }
+    }, 250);
+}
+
+watch(() => props.importTransactions?.map(transaction => [transaction.index, transaction.type, transaction.time,
+    transaction.utcOffset, transaction.sourceAmount, transaction.comment]), scheduleDuplicateCheck, { immediate: true, flush: 'sync' });
+onBeforeUnmount(() => {
+    duplicateCheckVersion++;
+    clearTimeout(duplicateCheckTimer);
+});
+
 watch(filters, () => {
     clearSelectedTransactionsNotDisplayed();
     currentPage.value = 1;
@@ -2330,6 +2394,7 @@ defineExpose({
     toolMenus,
     isEditing,
     canImport,
+    allowDuplicates,
     showBatchApplyRulesDialog,
     updateAllTransactionsIsValid,
     reset,
@@ -2348,6 +2413,25 @@ defineExpose({
     th:last-child,
     td:last-child {
         width: 100% !important;
+    }
+}
+
+.import-transaction-table > .v-table__wrapper > table {
+    th:first-child,
+    td:first-child,
+    th:nth-child(2),
+    td:nth-child(2) {
+        padding-inline: 8px;
+    }
+
+    th:first-child,
+    td:first-child {
+        padding-inline-end: 0;
+    }
+
+    th:nth-child(2),
+    td:nth-child(2) {
+        padding-inline-start: 0;
     }
 }
 

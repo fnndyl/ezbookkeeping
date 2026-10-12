@@ -1199,7 +1199,7 @@ function batchApplyRules(): void {
 }
 
 function submit(): void {
-    if (importTransactionCheckDataTab.value?.isEditing) {
+    if (importTransactionCheckDataTab.value?.isEditing || !importTransactionCheckDataTab.value?.canImport) {
         return;
     }
 
@@ -1207,6 +1207,7 @@ function submit(): void {
 
     if (importTransactions.value) {
         for (const importTransaction of importTransactions.value) {
+            if (importTransaction.duplicate && !importTransactionCheckDataTab.value?.allowDuplicates) continue;
             if (importTransaction.valid && importTransaction.selected) {
                 transactions.push(importTransaction);
             } else if (!importTransaction.valid && importTransaction.selected) {
@@ -1260,7 +1261,8 @@ function submit(): void {
 
         transactionsStore.importTransactions({
             transactions: transactions,
-            clientSessionId: clientSessionId.value
+            clientSessionId: clientSessionId.value,
+            allowDuplicates: importTransactionCheckDataTab.value?.allowDuplicates || false
         }).then(response => {
             if (showProcessTimer) {
                 importProcess.value = 0;

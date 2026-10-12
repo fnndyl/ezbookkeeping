@@ -199,8 +199,10 @@ type TransactionModifyRequest struct {
 
 // TransactionImportRequest represents all parameters of transaction import request
 type TransactionImportRequest struct {
-	Transactions    []*TransactionCreateRequest `json:"transactions"`
-	ClientSessionId string                      `json:"clientSessionId"`
+	AllowDuplicates      bool                        `json:"allowDuplicates"`
+	DuplicateOccurrences []int                       `json:"duplicateOccurrences"`
+	Transactions         []*TransactionCreateRequest `json:"transactions"`
+	ClientSessionId      string                      `json:"clientSessionId"`
 }
 
 // TransactionImportProcessRequest represents all parameters of transaction import process request

@@ -2783,6 +2783,27 @@ func (a *TransactionsApi) TransactionParseImportFileHandler(c *core.WebContext) 
 	return parsedTransactionResps, nil
 }
 
+// TransactionCheckImportDuplicatesHandler checks preview rows without requiring mapped accounts.
+func (a *TransactionsApi) TransactionCheckImportDuplicatesHandler(c *core.WebContext) (any, *errs.Error) {
+	var req models.ImportDuplicateCheckRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		return nil, errs.NewIncompleteOrIncorrectSubmissionError(err)
+	}
+	uid := c.GetCurrentUid()
+	user, err := a.users.GetUserById(c, uid)
+	if err != nil {
+		return nil, errs.ErrUserNotFound
+	}
+	if user.FeatureRestriction.Contains(core.USER_FEATURE_RESTRICTION_TYPE_IMPORT_TRANSACTION) {
+		return nil, errs.ErrNotPermittedToPerformThisAction
+	}
+	matches, err := a.transactions.CheckImportDuplicates(c, uid, req.Transactions, nil)
+	if err != nil {
+		return nil, errs.Or(err, errs.ErrOperationFailed)
+	}
+	return matches, nil
+}
+
 // TransactionImportHandler imports transactions by request parameters for current user
 func (a *TransactionsApi) TransactionImportHandler(c *core.WebContext) (any, *errs.Error) {
 	var transactionImportReq models.TransactionImportRequest
@@ -2793,6 +2814,14 @@ func (a *TransactionsApi) TransactionImportHandler(c *core.WebContext) (any, *er
 		return nil, errs.NewIncompleteOrIncorrectSubmissionError(err)
 	}
 
+	if len(transactionImportReq.Transactions) > 65535 {
+		return nil, errs.ErrImportTooManyTransaction
+	}
+	for _, transaction := range transactionImportReq.Transactions {
+		if transaction == nil {
+			return nil, errs.ErrParameterInvalid
+		}
+	}
 	clientTimezone, err := c.GetClientTimezone()
 
 	if err != nil {
@@ -2801,6 +2830,8 @@ func (a *TransactionsApi) TransactionImportHandler(c *core.WebContext) (any, *er
 	}
 
 	uid := c.GetCurrentUid()
+	unlockImport := services.LockTransactionImport(uid)
+	defer unlockImport()
 
 	if a.CurrentConfig().EnableDuplicateSubmissionsCheck && transactionImportReq.ClientSessionId != "" {
 		found, remark := a.GetSubmissionRemark(duplicatechecker.DUPLICATE_CHECKER_TYPE_IMPORT_TRANSACTIONS, uid, transactionImportReq.ClientSessionId)
@@ -2905,6 +2936,31 @@ func (a *TransactionsApi) TransactionImportHandler(c *core.WebContext) (any, *er
 		}
 	}
 
+	if !transactionImportReq.AllowDuplicates {
+		candidates := make([]*models.ImportDuplicateCandidate, len(newTransactions))
+		for i, transaction := range newTransactions {
+			typ, _ := transaction.Type.ToTransactionType()
+			candidates[i] = &models.ImportDuplicateCandidate{Type: typ, Time: utils.GetUnixTimeFromTransactionTime(transaction.TransactionTime), UtcOffset: transaction.TimezoneUtcOffset, Amount: transaction.Amount, Comment: transaction.Comment}
+		}
+		matches, checkErr := a.transactions.CheckImportDuplicates(c, uid, candidates, transactionImportReq.DuplicateOccurrences)
+		if checkErr != nil {
+			return nil, errs.Or(checkErr, errs.ErrOperationFailed)
+		}
+		kept := make([]*models.Transaction, 0, len(newTransactions))
+		keptTags := make(map[int][]int64)
+		for i, transaction := range newTransactions {
+			if matches[i].Duplicate {
+				continue
+			}
+			keptTags[len(kept)] = newTransactionTagIdsMap[i]
+			kept = append(kept, transaction)
+		}
+		newTransactions, newTransactionTagIdsMap = kept, keptTags
+	}
+	if len(newTransactions) == 0 {
+		a.SetSubmissionRemarkIfEnable(duplicatechecker.DUPLICATE_CHECKER_TYPE_IMPORT_TRANSACTIONS, uid, transactionImportReq.ClientSessionId, "finished:0")
+		return 0, nil
+	}
 	err = a.transactions.BatchCreateTransactions(c, user.Uid, newTransactions, newTransactionTagIdsMap, func(currentProcess float64) {
 		a.SetSubmissionRemarkIfEnable(duplicatechecker.DUPLICATE_CHECKER_TYPE_IMPORT_TRANSACTIONS, uid, transactionImportReq.ClientSessionId, fmt.Sprintf("processing:%.2f", currentProcess))
 	})

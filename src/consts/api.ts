@@ -86,6 +86,9 @@ export const SPECIFIED_API_NOT_FOUND_ERRORS: Record<string, SpecifiedApiError> =
     '/api/v1/transactions/parse_import.json': {
         message: 'Transaction importing is disabled'
     },
+    '/api/v1/transactions/check_import_duplicates.json': {
+        message: 'Transaction importing is disabled'
+    },
     '/api/v1/transactions/import.json': {
         message: 'Transaction importing is disabled'
     },

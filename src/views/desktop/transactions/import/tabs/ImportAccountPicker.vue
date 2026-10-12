@@ -141,7 +141,7 @@ watch(open, async value => {
 
 <style scoped>
 .import-account-selection {
-    width: 260px;
+    width: 234px;
 }
 
 .import-account-activator {

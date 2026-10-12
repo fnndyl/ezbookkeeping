@@ -604,6 +604,8 @@ export interface TransactionBatchDeleteRequest {
 }
 
 export interface TransactionImportRequest {
+    readonly allowDuplicates?: boolean;
+    readonly duplicateOccurrences?: number[];
     readonly transactions: TransactionCreateRequest[];
     readonly clientSessionId: string;
 }

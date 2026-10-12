@@ -1676,7 +1676,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
         });
     }
 
-    function importTransactions({ transactions, clientSessionId }: { transactions: ImportTransaction[], clientSessionId: string }): Promise<number> {
+    function importTransactions({ transactions, clientSessionId, allowDuplicates = false }: { transactions: ImportTransaction[], clientSessionId: string, allowDuplicates?: boolean }): Promise<number> {
         const submitTransactions: TransactionCreateRequest[] = [];
 
         if (transactions) {
@@ -1689,11 +1689,13 @@ export const useTransactionsStore = defineStore('transactions', () => {
         return new Promise((resolve, reject) => {
             services.importTransactions({
                 transactions: submitTransactions,
-                clientSessionId: clientSessionId
+                clientSessionId: clientSessionId,
+                allowDuplicates,
+                duplicateOccurrences: transactions.map(transaction => transaction.duplicateOccurrence)
             }).then(response => {
                 const data = response.data;
 
-                if (!data || !data.success || !data.result) {
+                if (!data || !data.success || !isNumber(data.result)) {
                     reject({ message: 'Unable to import transactions' });
                     return;
                 }

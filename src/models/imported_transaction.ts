@@ -28,6 +28,8 @@ export class ImportTransaction implements ImportTransactionResponse {
     public index: number;
     public selected: boolean;
     public valid: boolean;
+    public duplicate = false;
+    public duplicateOccurrence = 1;
 
     private constructor(response: ImportTransactionResponse, index: number) {
         this.type = response.type;
@@ -149,4 +151,17 @@ export interface ImportTransactionResponse {
 export interface ImportTransactionResponsePageWrapper {
     readonly items: ImportTransactionResponse[];
     readonly totalCount: number;
+}
+
+export interface ImportDuplicateCandidate {
+    readonly type: number;
+    readonly time: number;
+    readonly utcOffset: number;
+    readonly amount: number;
+    readonly comment: string;
+}
+
+export interface ImportDuplicateMatch {
+    readonly duplicate: boolean;
+    readonly occurrence: number;
 }
